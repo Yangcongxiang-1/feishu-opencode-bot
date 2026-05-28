@@ -337,7 +337,7 @@ def _handle_slash_command(text: str) -> str | None:
     if cmd_lower in ("/", "/help", "/start"):
         return (
             "🤖 飞书机器人命令列表\n\n"
-            "━━━ 飞书专用 ━━━\n"
+            "━━━ 飞书命令 ━━━\n"
             "/help     显示此命令列表\n"
             "/status   查看机器人运行状态\n"
             "/session  查看当前会话信息\n"
@@ -347,19 +347,8 @@ def _handle_slash_command(text: str) -> str | None:
             "/clear    清空对话上下文\n"
             "/docs     读取飞书文档内容\n"
             "/feedback 反馈问题或建议\n"
-            "━━━ OpenCode 系统命令（转发 AI）━━━\n"
-            "/refactor       智能重构代码\n"
-            "/init-deep      初始化知识库\n"
-            "/ralph-loop     启动开发循环\n"
-            "/ulw-loop       启动超专注模式\n"
-            "/cancel-ralph   取消进行中的循环\n"
-            "/start-work     从计划开始工作\n"
-            "/stop-continuation 停止继续\n"
-            "/remove-ai-slops 去除 AI 代码味道\n"
-            "/handoff        生成交接文档\n"
-            "/hyperplan      对抗式多智能体规划\n"
             "━━━━━━━━━━━━━━━━━━\n"
-            "输入以上任意命令，AI 会自动处理\n"
+            "其他 OpenCode 斜杠命令可直接发送，AI 会自动处理。\n"
         )
 
     # ── 内置命令 ──

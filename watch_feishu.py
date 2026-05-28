@@ -330,6 +330,7 @@ def _extract_open_id(sender_id) -> str:
 
 def _handle_slash_command(text: str) -> str | None:
     """处理斜杠命令。内置命令直接回复，其他转发 AI 处理。"""
+    global _feishu_session_id
     cmd = text.strip()
     cmd_lower = cmd.lower()
 
@@ -341,6 +342,7 @@ def _handle_slash_command(text: str) -> str | None:
             "/help     显示此命令列表\n"
             "/status   查看机器人运行状态\n"
             "/session  查看当前会话信息\n"
+            "/new      创建一个全新的 AI 会话\n"
             "/history  查看最近对话记录\n"
             "/config   查看系统配置\n"
             "/version  查看版本信息\n"
@@ -370,6 +372,19 @@ def _handle_slash_command(text: str) -> str | None:
         return "\n".join(lines)
     if cmd_lower == "/session":
         return f"📋 会话 ID: {_feishu_session_id or '无'}\nWeb UI: http://localhost:4096"
+    if cmd_lower in ("/new", "/newsession"):
+        log("🔄 用户请求创建新会话...")
+        sid = create_feishu_session()
+        if sid:
+            _feishu_session_id = sid
+            return (
+                f"✅ 已创建新会话\n\n"
+                f"会话 ID: {sid}\n"
+                f"从现在开始，你的消息将使用新会话处理。\n"
+                f"旧会话仍可在 Web UI 查看。"
+            )
+        else:
+            return "❌ 创建新会话失败，请稍后重试。"
     if cmd_lower == "/history":
         return "📜 历史记录功能正在开发中，敬请期待。"
     if cmd_lower == "/config":

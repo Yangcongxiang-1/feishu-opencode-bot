@@ -15,13 +15,13 @@ nohup opencode web --port 4096 > /tmp/opencode-web.log 2>&1 &
 echo "  opencode web PID: $!"
 
 # 2. 启动飞书消息接收网关（WebSocket 长连接）
-nohup "$VENV_P" "$DIR/feishu_bot.py" > /tmp/feishu-bot.log 2>&1 &
+nohup "$VENV_P" -u "$DIR/feishu_bot.py" > /tmp/feishu-bot.log 2>&1 &
 echo "  feishu_bot PID: $!"
 
 sleep 3
 
 # 3. 启动消息监控（自动转发飞书消息到 AI 并回复）
-nohup "$VENV_P" "$DIR/watch_feishu.py" > /tmp/watch-feishu.log 2>&1 &
+nohup "$VENV_P" -u "$DIR/watch_feishu.py" > /tmp/watch-feishu.log 2>&1 &
 echo "  watch_feishu PID: $!"
 
 sleep 2

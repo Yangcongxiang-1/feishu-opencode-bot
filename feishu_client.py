@@ -294,9 +294,9 @@ class FeishuClient:
         Returns:
             机器人信息（包括名称、描述等）。
         """
-        result = self._get("/im/v1/bots/info")
+        result = self._get("/bot/v3/info")
         if result.get("code") == 0:
-            return {"ok": True, "data": result.get("data", {})}
+            return {"ok": True, "data": result.get("bot", {})}
         return {"ok": False, "error": result.get("msg", "查询失败")}
 
     def read_docx(self, document_id: str) -> dict:

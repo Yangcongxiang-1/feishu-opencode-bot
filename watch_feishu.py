@@ -123,7 +123,7 @@ def create_feishu_session() -> str | None:
                 "--format", "json",
                 "初始化飞书处理会话",
             ],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True, text=True, timeout=120,
         )
         # 从 JSON lines 中提取 sessionID
         for line in result.stdout.splitlines():

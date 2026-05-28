@@ -299,6 +299,23 @@ class FeishuClient:
             return {"ok": True, "data": result.get("data", {})}
         return {"ok": False, "error": result.get("msg", "查询失败")}
 
+    def read_docx(self, document_id: str) -> dict:
+        """读取飞书 Docx 文档内容。
+
+        需要应用拥有 docx:document:readonly 权限，
+        且文档需对机器人有可读权限（同租户文档通常可读）。
+
+        Args:
+            document_id: 文档 ID（从分享链接中提取）
+
+        Returns:
+            {"ok": True, "data": {"content": "..."}} 或 {"ok": False, "error": "..."}
+        """
+        result = self._get(f"/docx/v1/documents/{document_id}/raw_content")
+        if result.get("code") == 0:
+            return {"ok": True, "data": result.get("data", {})}
+        return {"ok": False, "error": result.get("msg", "读取文档失败")}
+
     def status_check(self) -> dict:
         """全面检查机器人连通性。
 

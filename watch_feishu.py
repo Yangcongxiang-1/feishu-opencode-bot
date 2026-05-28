@@ -328,6 +328,109 @@ def _extract_open_id(sender_id) -> str:
     return str(sender_id) if sender_id else ""
 
 
+def _handle_slash_command(text: str) -> str | None:
+    """处理斜杠命令。输入 / 或 /help 等时返回命令列表，不经过 AI。"""
+    cmd = text.strip()
+    cmd_lower = cmd.lower()
+
+    # ── /help 命令列表 ──
+    if cmd_lower in ("/", "/help", "/start"):
+        return (
+            "🤖 飞书机器人命令列表\n\n"
+            "━━━ 基本 ━━━\n"
+            "/agent    与 AI 自由对话（直接发消息即可）\n"
+            "/help     显示此命令列表\n"
+            "━━━ 信息 ━━━\n"
+            "/status   查看机器人运行状态\n"
+            "/session  查看当前会话信息\n"
+            "/history  查看最近对话记录\n"
+            "/config   查看系统配置\n"
+            "/version  查看版本信息\n"
+            "━━━ 操作 ━━━\n"
+            "/clear    清空当前对话上下文\n"
+            "/docs     读取飞书文档内容\n"
+            "━━━ 其他 ━━━\n"
+            "/feedback 反馈问题或建议\n"
+        )
+
+    # ── /clear ──
+    if cmd_lower == "/clear":
+        return "🧹 清空对话功能目前需要手动处理，后续版本将支持一键清空。"
+
+    # ── /status ──
+    if cmd_lower == "/status":
+        lines = ["📊 机器人运行状态", ""]
+        try:
+            import subprocess
+            # 检查 opencode web
+            r1 = subprocess.run(
+                ["pgrep", "-f", "opencode web"],
+                capture_output=True, timeout=5
+            )
+            lines.append(f"OpenCode Web:  {'✅ 运行中' if r1.returncode == 0 else '❌ 未运行'}")
+            # 检查 feishu_bot
+            r2 = subprocess.run(
+                ["pgrep", "-f", "feishu_bot"],
+                capture_output=True, timeout=5
+            )
+            lines.append(f"feishu_bot:   {'✅ 运行中' if r2.returncode == 0 else '❌ 未运行'}")
+            # 检查 watch_feishu
+            r3 = subprocess.run(
+                ["pgrep", "-f", "watch_feishu"],
+                capture_output=True, timeout=5
+            )
+            lines.append(f"watch_feishu: {'✅ 运行中' if r3.returncode == 0 else '❌ 未运行'}")
+        except Exception:
+            lines.append("状态检查异常")
+        lines.append("")
+        lines.append("会话 ID: " + (_feishu_session_id or "无"))
+        return "\n".join(lines)
+
+    # ── /session ──
+    if cmd_lower == "/session":
+        return (
+            f"📋 当前会话信息\n\n"
+            f"会话 ID: {_feishu_session_id or '无'}\n"
+            f"Web UI:  http://localhost:4096\n"
+            f"状态:    {'✅ 已连接' if _feishu_session_id else '❌ 未连接'}\n"
+        )
+
+    # ── /history ──
+    if cmd_lower == "/history":
+        return "📜 历史记录功能正在开发中，敬请期待。"
+
+    # ── /config ──
+    if cmd_lower == "/config":
+        return (
+            "⚙️ 系统配置\n\n"
+            f"OpenCode 端口: 4096\n"
+            f"会话 ID: {_feishu_session_id or '无'}\n"
+            f"Inbox 文件: /tmp/feishu-inbox.json\n"
+            f"消息时效: 30 秒\n"
+            f"稳定检测: 5 秒\n"
+        )
+
+    # ── /version ──
+    if cmd_lower == "/version":
+        return (
+            "📦 版本信息\n\n"
+            "飞书 OpenCode Bot v1.0\n"
+            "架构: WebSocket 长连接\n"
+            "AI: OpenCode (big-pickle)\n"
+            "SDK: lark-oapi\n"
+        )
+
+    # ── /docs ──
+    if cmd_lower.startswith("/docs"):
+        return "📄 请发送飞书文档链接给我，我会尝试读取文档内容。\n格式示例: 直接粘贴文档链接即可"
+
+    # ── /feedback ──
+    if cmd_lower == "/feedback":
+        return "💬 有什么问题或建议请直接描述发送即可，AI 会处理。"
+
+    return None
+
+
 def handle_message(msg: dict) -> None:
     """处理单条飞书消息。"""
     global _client
@@ -369,23 +472,38 @@ def handle_message(msg: dict) -> None:
         log("⚠️ FeishuClient 未初始化，跳过回复")
         return
 
+    # ── 斜杠命令：直接返回命令列表，不经过 AI ──
+    if text.startswith("/"):
+        reply = _handle_slash_command(text)
+        if reply:
+            _send_reply(sender_id, reply)
+            return
+
     # 通过 AI 处理消息
     reply = process_with_ai(text, sender_id, chat_id)
     if reply is None:
         # fallback: 简单回复
         reply = f"收到你的消息了 ✅ 我会尽快处理。消息内容：{text[:100]}"
 
-    # 发送回复到飞书
+    _send_reply(sender_id, reply)
+
+
+def _send_reply(send_to: str, reply_text: str) -> None:
+    """发送回复到飞书并记录日志。"""
+    global _client
+    if not _client:
+        log("⚠️ FeishuClient 未初始化，无法发送")
+        return
     try:
-        result = _client.send_text(sender_id, reply)
+        result = _client.send_text(send_to, reply_text)
         if result.get("ok"):
             append_chat_log({
                 "time": datetime.now().isoformat(),
                 "sender_id": "bot",
-                "text": reply,
+                "text": reply_text,
                 "direction": "out",
             })
-            log(f"✅ 已回复飞书用户: {reply[:100]}")
+            log(f"✅ 已回复飞书用户: {reply_text[:100]}")
         else:
             log(f"⚠️ 回复失败: {result.get('error')}")
     except Exception as e:

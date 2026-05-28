@@ -35,6 +35,7 @@ from config import Config
 INBOX_FILE = "/tmp/feishu-inbox.json"
 CHAT_LOG = "/tmp/feishu-chat.log"
 SESSION_FILE = os.path.expanduser("~/.config/opencode/skills/feishu-bot/.feishu_session_id")
+SESSION_HISTORY_FILE = os.path.expanduser("~/.config/opencode/skills/feishu-bot/.feishu_sessions.json")
 OPENCODE_WEB_URL = "http://127.0.0.1:4096"
 POLL_INTERVAL = 1.5
 
@@ -85,6 +86,27 @@ def save_session_id(session_id: str) -> None:
         log(f"✅ 已保存飞书会话 ID: {session_id[:20]}...")
     except Exception as e:
         log(f"⚠️ 保存会话 ID 失败: {e}")
+
+
+def load_session_history() -> list[dict]:
+    """加载会话历史列表。"""
+    if os.path.exists(SESSION_HISTORY_FILE):
+        try:
+            with open(SESSION_HISTORY_FILE, "r") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return []
+
+
+def save_session_history(history: list[dict]) -> None:
+    """保存会话历史列表。"""
+    try:
+        os.makedirs(os.path.dirname(SESSION_HISTORY_FILE), exist_ok=True)
+        with open(SESSION_HISTORY_FILE, "w") as f:
+            json.dump(history, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        log(f"⚠️ 保存会话历史失败: {e}")
 
 
 def create_feishu_session() -> str | None:
@@ -371,17 +393,35 @@ def _handle_slash_command(text: str) -> str | None:
         lines.append("会话: " + (_feishu_session_id or "无"))
         return "\n".join(lines)
     if cmd_lower == "/session":
-        return f"📋 会话 ID: {_feishu_session_id or '无'}\nWeb UI: http://localhost:4096"
+        history = load_session_history()
+        lines = ["📋 会话列表", ""]
+        lines.append(f"【当前】 {_feishu_session_id or '无'}")
+        if history:
+            lines.append("")
+            lines.append("━━━ 历史会话 ━━━")
+            for i, h in enumerate(reversed(history), 1):
+                sid_short = h["id"][:16] + "..."
+                lines.append(f"  {i}. {sid_short}")
+            lines.append("")
+            lines.append("发送编号（如 1）可切换到对应会话")
+        return "\n".join(lines)
     if cmd_lower in ("/new", "/newsession"):
         log("🔄 用户请求创建新会话...")
+        # 保存当前会话到历史
+        if _feishu_session_id:
+            history = load_session_history()
+            history = [h for h in history if h.get("id") != _feishu_session_id]
+            history.append({"id": _feishu_session_id, "saved_at": int(time.time())})
+            history = history[-10:]
+            save_session_history(history)
+        # 创建新会话
         sid = create_feishu_session()
         if sid:
             _feishu_session_id = sid
             return (
                 f"✅ 已创建新会话\n\n"
-                f"会话 ID: {sid}\n"
-                f"从现在开始，你的消息将使用新会话处理。\n"
-                f"旧会话仍可在 Web UI 查看。"
+                f"新会话 ID: {sid}\n"
+                f"发 /session 查看所有会话"
             )
         else:
             return "❌ 创建新会话失败，请稍后重试。"
@@ -447,6 +487,20 @@ def handle_message(msg: dict) -> None:
         if reply:
             _send_reply(sender_id, reply)
             return
+
+    # ── 会话切换：纯数字 → 切换到历史会话 ──
+    text_stripped = text.strip()
+    if text_stripped.isdigit() and _feishu_session_id:
+        history = load_session_history()
+        idx = int(text_stripped)
+        if 1 <= idx <= len(history):
+            target = history[-idx]["id"]
+            if target != _feishu_session_id:
+                _feishu_session_id = target
+                save_session_id(target)
+                _send_reply(sender_id, f"✅ 已切换到会话 #{idx}")
+                log(f"🔄 切换到历史会话 #{idx}: {target[:20]}...")
+                return
 
     # 通过 AI 处理消息
     reply = process_with_ai(text, sender_id, chat_id)

@@ -454,13 +454,6 @@ def handle_message(msg: dict) -> None:
     chat_id = msg.get("chat_id", "")
     sender_id = _extract_open_id(sender_id_raw)
 
-    # ── 时效过滤：只处理 30 秒内的消息 ──
-    msg_time = msg.get("timestamp", 0)
-    if not msg_time or int(time.time()) - msg_time > 30:
-        if msg_time:
-            log(f"⏭️ 跳过过期消息（>30s）: {text[:80]}")
-        return
-
     log(f"📩 {'私聊' if chat_type == 'p2p' else '群聊'} {sender_id[-12:]}: {text[:200]}")
 
     append_chat_log({
@@ -481,12 +474,19 @@ def handle_message(msg: dict) -> None:
         log("⚠️ FeishuClient 未初始化，跳过回复")
         return
 
-    # ── 斜杠命令：直接返回命令列表，不经过 AI ──
+    # ── 斜杠命令：直接回复，不受时效限制 ──
     if text.startswith("/"):
         reply = _handle_slash_command(text)
         if reply:
             _send_reply(sender_id, reply)
             return
+
+    # ── 时效过滤：只处理 30 秒内的消息（斜杠命令已提前返回） ──
+    msg_time = msg.get("timestamp", 0)
+    if not msg_time or int(time.time()) - msg_time > 30:
+        if msg_time:
+            log(f"⏭️ 跳过过期消息（>30s）: {text[:80]}")
+        return
 
     # ── 会话切换：纯数字 → 切换到历史会话 ──
     text_stripped = text.strip()
